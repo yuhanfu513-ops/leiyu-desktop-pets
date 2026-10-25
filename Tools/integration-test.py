@@ -314,7 +314,9 @@ with tempfile.TemporaryDirectory(prefix="leiyu-test-") as tmp:
             "clips": {"lei": len(clips["lei"]), "yu": len(clips["yu"])},
             "pairs": len(pairs),
         }
-        (root / "Work/integration-results.json").write_text(
+        results_path = root / "Work/integration-results.json"
+        results_path.parent.mkdir(parents=True, exist_ok=True)
+        results_path.write_text(
             json.dumps(results, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
         print("PASS", flush=True)
