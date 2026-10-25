@@ -6,11 +6,13 @@
 
 这 17 段里配成了 **8 组一问一答**：两位靠近时点任一人像，雷军先说一段，余承东马上接对应的那一段；只有正在说话的一方弹动、显示字幕。没靠近时点谁就只播谁自己的单段。把两个人物拖近，两颗头会向对方倾斜。
 
+![雷军与余承东靠近时：一位说话，一位安静歪头](docs/preview.png)
+
 ## 安装与启动
 
 支持 Apple Silicon Mac，系统需要 macOS 14 或更新版本。
 
-1. 解压 `雷余双桌宠-安装包.zip`。
+1. 从 [Releases](https://github.com/yuhanfu513-ops/leiyu-desktop-pets/releases/latest) 下载 `雷余双桌宠-安装包.zip`，解压。
 2. 将其中的两个 `.app` 都拖到“应用程序”。
 3. 分别双击两个桌宠启动；也可以先打开其中一个，再通过右键菜单打开另一位。
 
@@ -88,7 +90,15 @@ open build/余承东桌宠.app
 
 构建脚本会生成两个独立应用、复制 `clips.json` 和 `Clips/` 到各自的 `Contents/Resources`，并进行本地签名。图标已包含在 `Assets` 内；如果替换图片，可通过 `Tools/make-icons.swift` 重新生成图标。
 
-如果修改了 `Tools/lines.json`，先运行上面的 `Tools/build-clips.py` 再构建。该脚本需要项目内的 `Tools/venv`（PyAV、NumPy）。
+如果修改了 `Tools/lines.json`，先运行 `Tools/build-clips.py` 再构建。仓库不包含 `Tools/venv`（虚拟环境太大），需要时自行创建：
+
+```sh
+python3 -m venv Tools/venv
+Tools/venv/bin/pip install av numpy
+Tools/venv/bin/python Tools/build-clips.py
+```
+
+如果重新跑说话人分离/转写，再安装 `sherpa-onnx`、`faster-whisper`（见 `Tools/diarize.py`、`Tools/transcribe-lines.py`）。
 
 重新生成安装包：
 
