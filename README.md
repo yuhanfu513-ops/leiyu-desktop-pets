@@ -143,4 +143,4 @@ python3 Tools/integration-test.py
 
 ## 许可
 
-代码与文档采用根目录的 MIT `LICENSE`。窗口与拖动交互参考 SunPet，保留其 `LICENSE-SunPet`。人物图片和音频素材不属于代码许可范围。
+代码与文档采用根目录的 MIT `LICENSE`。窗口与拖动交互参考 SunPet，保留其 `LICENSE-SunPet`。人物图片和音频素材不属于代码许可范围，权利归各自权利人。
