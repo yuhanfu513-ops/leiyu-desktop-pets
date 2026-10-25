@@ -12,7 +12,7 @@
 
 支持 Apple Silicon Mac，系统需要 macOS 14 或更新版本。
 
-1. 从 [Releases](https://github.com/yuhanfu513-ops/leiyu-desktop-pets/releases/latest) 下载 `雷余双桌宠-安装包.zip`，解压。
+1. 从 [Releases](https://github.com/yuhanfu513-ops/leiyu-desktop-pets/releases/latest) 下载 `LeiYu-Desktop-Pets-v2.0.zip`，解压。
 2. 将其中的两个 `.app` 都拖到“应用程序”。
 3. 分别双击两个桌宠启动；也可以先打开其中一个，再通过右键菜单打开另一位。
 
