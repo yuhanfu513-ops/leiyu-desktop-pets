@@ -22,8 +22,10 @@ apps = {
 }
 resources = {role: exe.parents[1] / "Resources" for role, exe in apps.items()}
 all_clips = json.loads((resources["lei"] / "clips.json").read_text(encoding="utf-8"))
+helium_clips = json.loads((resources["lei"] / "clips-helium.json").read_text(encoding="utf-8"))
 clips = {role: sorted((c for c in all_clips if c["role"] == role), key=lambda c: c["duration"]) for role in apps}
 clip_by_id = {c["id"]: c for c in all_clips}
+helium_by_id = {c["id"]: c for c in helium_clips}
 pairs = json.loads((resources["lei"] / "pairs.json").read_text(encoding="utf-8"))
 checks = []
 
@@ -78,10 +80,18 @@ with tempfile.TemporaryDirectory(prefix="leiyu-test-") as tmp:
         assert len({c["id"] for c in all_clips}) == len(all_clips)
         assert len(pairs) == 8
         assert all(clip_by_id[p["lei"]]["role"] == "lei" and clip_by_id[p["yu"]]["role"] == "yu" for p in pairs)
+        assert all(helium_by_id[p["lei"]]["role"] == "lei" and helium_by_id[p["yu"]]["role"] == "yu" for p in pairs)
         assert (resources["yu"] / "pairs.json").is_file()
-        print("OK clips metadata: %d lei + %d yu, files present" % (len(clips["lei"]), len(clips["yu"])), flush=True)
-        print("OK dialogue pairs: %d" % len(pairs), flush=True)
-        checks.append("clips metadata split by speaker")
+        assert len(helium_clips) == len(all_clips)
+        assert [c["id"] for c in helium_clips] == [c["id"] for c in all_clips]
+        assert [c["text"] for c in helium_clips] == [c["text"] for c in all_clips]
+        assert all((resources[c["role"]] / "Clips-helium" / c["file"]).is_file() for c in helium_clips)
+        assert all(c["text"] and c["duration"] > 0.2 for c in helium_clips)
+        assert all(c.get("lines") and all(line["text"] for line in c["lines"]) for c in helium_clips)
+        assert all(c["duration"] <= clip_by_id[c["id"]]["duration"] + 0.01 for c in helium_clips)
+        print("OK clips metadata: %d lei + %d yu, normal and helium files present" % (len(clips["lei"]), len(clips["yu"])), flush=True)
+        print("OK dialogue pairs: %d, shared by both voices" % len(pairs), flush=True)
+        checks.append("clips metadata split by speaker, normal + helium")
         checks.append("dialogue pairs metadata")
 
         for role, exe in apps.items():
@@ -95,7 +105,8 @@ with tempfile.TemporaryDirectory(prefix="leiyu-test-") as tmp:
 
         assert not state("lei")["playing"] and not state("lei")["animating"] and not state("lei")["subtitle"]
         assert not state("yu")["playing"] and not state("yu")["animating"] and not state("yu")["subtitle"]
-        print("OK both pets start idle", flush=True)
+        assert not state("lei").get("helium") and not state("yu").get("helium")
+        print("OK both pets start idle in the normal voice", flush=True)
         checks.append("both pets start idle")
 
         lei_mid = next(c for c in clips["lei"] if c["duration"] >= 2.0)
@@ -281,6 +292,53 @@ with tempfile.TemporaryDirectory(prefix="leiyu-test-") as tmp:
             4,
         )
 
+        command("lei", "voice", helium=True)
+        wait(
+            "Both pets switch to the 1.5x helium voice",
+            lambda: state("lei").get("helium") and state("yu").get("helium"),
+            4,
+        )
+        helium_short = next(c for c in helium_clips if c["role"] == "yu" and c["duration"] >= 1.5)
+        command("yu", "click", clipID=helium_short["id"])
+        wait(
+            "A helium clip plays with its subtitle",
+            lambda: state("yu").get("playing")
+            and state("yu").get("clipID") == helium_short["id"]
+            and state("yu").get("subtitle") == helium_short["lines"][0]["text"]
+            and not state("lei").get("playing"),
+            3,
+        )
+        command("yu", "stop")
+        wait("Stopping the helium clip clears it", lambda: not state("yu").get("playing") and not state("yu").get("subtitle"), 4)
+
+        helium_pair = pairs[2]
+        hp_lei, hp_yu = helium_by_id[helium_pair["lei"]], helium_by_id[helium_pair["yu"]]
+        command("lei", "pair", pairID=helium_pair["id"])
+        wait(
+            "A helium duet still starts with Lei",
+            lambda: state("lei").get("playing")
+            and state("lei").get("clipID") == hp_lei["id"]
+            and state("lei").get("helium")
+            and not state("yu").get("playing"),
+            4,
+        )
+        wait(
+            "The helium duet moves to Yu",
+            lambda: state("yu").get("playing")
+            and state("yu").get("clipID") == hp_yu["id"]
+            and state("yu").get("helium")
+            and not state("lei").get("playing"),
+            5,
+        )
+        wait("The helium duet finishes", lambda: not state("lei").get("playing") and not state("yu").get("playing"), 5)
+
+        command("lei", "voice", helium=False)
+        wait(
+            "Both pets switch back to the normal voice",
+            lambda: not state("lei").get("helium") and not state("yu").get("helium"),
+            4,
+        )
+
         move_gap(200)
         wait("Separating after speaking straightens both heads", upright, 5)
 
@@ -313,6 +371,7 @@ with tempfile.TemporaryDirectory(prefix="leiyu-test-") as tmp:
             "checks": checks,
             "clips": {"lei": len(clips["lei"]), "yu": len(clips["yu"])},
             "pairs": len(pairs),
+            "voices": {"normal": len(all_clips), "helium": len(helium_clips)},
         }
         results_path = root / "Work/integration-results.json"
         results_path.parent.mkdir(parents=True, exist_ok=True)

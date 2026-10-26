@@ -57,6 +57,7 @@ struct SharedSettings: Codable {
     var volume: Float = 0.65
     var distance: Double = 32
     var enabled = true
+    var helium: Bool?
 }
 struct PeerState: Codable {
     let role: String
@@ -74,6 +75,7 @@ struct PeerState: Codable {
     let clipID: Int?
     let subtitle: String
     let plays: Int
+    let helium: Bool?
     var rect: NSRect { NSRect(x:x,y:y,width:width,height:height) }
     func isFresh(now: Double) -> Bool {
         let age = now-time
@@ -250,6 +252,7 @@ struct TestCommand: Decodable {
     let y:Double?
     let clipID:Int?
     let pairID:Int?
+    let helium:Bool?
 }
 final class PetApp: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate {
     let role=Role(rawValue:Bundle.main.object(forInfoDictionaryKey:"PetRole") as? String ?? "lei")!
@@ -267,8 +270,11 @@ final class PetApp: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate {
     var dialogueURL:URL { stateDirectory.appendingPathComponent("dialogue.json") }
     func stateURL(_ r:Role)->URL { stateDirectory.appendingPathComponent(r.rawValue+".json") }
     var settings=SharedSettings()
+    var normalClips:[Clip]=[]
+    var heliumClips:[Clip]=[]
     var allClips:[Clip]=[]
     var clips:[Clip]=[]
+    var activeHelium=false
     var pairs:[DialoguePair]=[]
     var bag=ShuffleBag()
     var pairBag=ShuffleBag()
@@ -298,18 +304,32 @@ final class PetApp: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate {
     let playbackName=Notification.Name("local.leiyupets.playbackChanged.v2")
     var panelSize:NSSize { NSSize(width:size+96,height:size*imageRatio+112) }
     var resources:URL { Bundle.main.resourceURL! }
-    func clipURL(_ c:Clip)->URL { resources.appendingPathComponent("Clips/"+c.file) }
+    func clipURL(_ c:Clip)->URL { clipURL(c,helium:activeHelium) }
+    func clipURL(_ c:Clip,helium:Bool)->URL {
+        resources.appendingPathComponent((helium ? "Clips-helium/":"Clips/")+c.file)
+    }
+    func applyClipSet(_ helium:Bool,resetBags:Bool = true) {
+        let use=helium && !heliumClips.isEmpty
+        activeHelium=use
+        allClips=use ? heliumClips:normalClips
+        clips=allClips.filter{$0.role==role}
+        if resetBags { bag=ShuffleBag();pairBag=ShuffleBag() }
+    }
     func applicationDidFinishLaunching(_ notification:Notification) {
         if !testing && NSRunningApplication.runningApplications(withBundleIdentifier:role.bundleID).contains(where:{$0.processIdentifier != getpid()}) { NSApp.terminate(nil);return }
         guard let image=NSImage(contentsOf:resources.appendingPathComponent("face.png")),image.size.width>0 else { fail("人物图片无法读取");return }
         do {
-            allClips=try JSONDecoder().decode([Clip].self,from:Data(contentsOf:resources.appendingPathComponent("clips.json")))
-            clips=allClips.filter{$0.role==role}
-            guard !clips.isEmpty else { throw NSError(domain:"没有该人物的台词",code:1) }
-            for c in clips { guard FileManager.default.fileExists(atPath:clipURL(c).path) else { throw NSError(domain:"缺少台词音频",code:c.id) } }
+            normalClips=try JSONDecoder().decode([Clip].self,from:Data(contentsOf:resources.appendingPathComponent("clips.json")))
+            heliumClips=(try? JSONDecoder().decode([Clip].self,from:Data(contentsOf:resources.appendingPathComponent("clips-helium.json")))) ?? []
+            guard !normalClips.isEmpty else { throw NSError(domain:"没有该人物的台词",code:1) }
             if let data=try? Data(contentsOf:resources.appendingPathComponent("pairs.json")) {
                 pairs=(try? JSONDecoder().decode([DialoguePair].self,from:data)) ?? []
             }
+            applyClipSet(readSettings().helium ?? false,resetBags:true)
+            if selfTest { applyClipSet(false) }
+            guard !clips.isEmpty else { throw NSError(domain:"没有该人物的台词",code:1) }
+            for c in normalClips where c.role==role { guard FileManager.default.fileExists(atPath:clipURL(c,helium:false).path) else { throw NSError(domain:"缺少原声台词音频",code:c.id) } }
+            for c in heliumClips where c.role==role { guard FileManager.default.fileExists(atPath:clipURL(c,helium:true).path) else { throw NSError(domain:"缺少氦气版台词音频",code:c.id) } }
             if !selfTest {
                 try FileManager.default.createDirectory(at:stateDirectory,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
                 lockFD=Darwin.open(stateDirectory.appendingPathComponent("audio.lock").path,O_CREAT|O_RDWR,0o600)
@@ -357,7 +377,7 @@ final class PetApp: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate {
     var portraitRect:NSRect { panel.convertToScreen(pet.face.convert(pet.face.imageRect,to:nil)) }
     func publish() {
         let r=portraitRect
-        let v=PeerState(role:role.rawValue,session:session,pid:getpid(),time:ProcessInfo.processInfo.systemUptime,x:r.minX,y:r.minY,width:r.width,height:r.height,playing:player?.isPlaying==true,animating:pet.speaking,angle:pet.face.angle,compression:pet.face.compression,clipID:currentClip?.id,subtitle:pet.caption.isHidden ? "" : pet.caption.text,plays:plays)
+        let v=PeerState(role:role.rawValue,session:session,pid:getpid(),time:ProcessInfo.processInfo.systemUptime,x:r.minX,y:r.minY,width:r.width,height:r.height,playing:player?.isPlaying==true,animating:pet.speaking,angle:pet.face.angle,compression:pet.face.compression,clipID:currentClip?.id,subtitle:pet.caption.isHidden ? "" : pet.caption.text,plays:plays,helium:activeHelium)
         try? JSONEncoder().encode(v).write(to:stateURL(role),options:.atomic)
     }
     func claim()->PlaybackClaim? {
@@ -396,6 +416,11 @@ final class PetApp: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate {
     func tick() {
         if integrationRoot != nil { handleTestCommand() }
         settings=readSettings();player?.volume=testing ? 0 : settings.volume
+        let wantHelium=(settings.helium ?? false) && !heliumClips.isEmpty
+        if wantHelium != activeHelium {
+            stopLocal()
+            applyClipSet(wantHelium)
+        }
         reconcilePlayback()
         reconcileDialogue()
         if let player,player.isPlaying { updateSubtitle(for:player.currentTime) }
@@ -423,6 +448,16 @@ final class PetApp: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate {
         guard !pairs.isEmpty else { showCaption("还没有配对台词",seconds:3);return }
         guard isNearNow() else { showCaption("先把两位拖近一点",seconds:3);return }
         requestPair()
+    }
+    @objc func setVoiceMode(_ sender:NSMenuItem) { applyVoiceMode(sender.tag == 1) }
+    func applyVoiceMode(_ want:Bool) {
+        guard want != (readSettings().helium ?? false) else { return }
+        if want && heliumClips.isEmpty { showCaption("氦气版音频未安装",seconds:3);return }
+        changeSettings { $0.helium = want }
+        guard (readSettings().helium ?? false) == want else { return }
+        stopAll()
+        applyClipSet(want)
+        showCaption(want ? "已切换到 1.5 倍氦气版" : "已切换回原声",seconds:2)
     }
     func requestPair(_ pairID:Int? = nil) {
         guard !pairs.isEmpty,isNearNow() else { return }
@@ -586,6 +621,13 @@ final class PetApp: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate {
         let title=item("\(role.appName) · \(clips.count)段",nil);title.isEnabled=false;m.addItem(title)
         m.addItem(item("随机说一段",#selector(playSoloNext)))
         m.addItem(item("两人对话一句",#selector(startDuet)))
+        let voice=item("声音模式",nil), voices=NSMenu()
+        let normalVoice=item("原声",#selector(setVoiceMode(_:)),tag:0)
+        normalVoice.state=(settings.helium ?? false) ? .off:.on
+        let heliumVoice=item("1.5倍氦气版",#selector(setVoiceMode(_:)),tag:1)
+        heliumVoice.state=(settings.helium ?? false) ? .on:.off
+        heliumVoice.isEnabled=(!heliumClips.isEmpty)
+        voices.addItem(normalVoice);voices.addItem(heliumVoice);voice.submenu=voices;m.addItem(voice)
         let choose=item("挑一段",nil), choices=NSMenu()
         for c in clips { choices.addItem(item(c.text.replacingOccurrences(of:"\n",with:" "),#selector(chooseClip(_:)),tag:c.id)) }
         choose.submenu=choices;m.addItem(choose)
@@ -643,6 +685,7 @@ final class PetApp: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate {
         case "move":if let x=cmd.x,let y=cmd.y { panel.setFrameOrigin(NSPoint(x:x,y:y)) }
         case "click": if let id=cmd.clipID,let c=clips.first(where:{$0.id==id}) { requestPlayback(c) } else { playNext() }
         case "pair": if let id=cmd.pairID { requestPair(id) }
+        case "voice": if let h=cmd.helium { applyVoiceMode(h) }
         case "stop":stopAll()
         case "quit":quit()
         default:break
@@ -652,23 +695,30 @@ final class PetApp: NSObject, NSApplicationDelegate, AVAudioPlayerDelegate {
         var failed=false
         func check(_ c:Bool,_ label:String) { print("\(c ? "OK":"FAIL") \(label)");if !c { failed=true } }
         check(!panel.isOpaque && !panel.canBecomeKey,"transparent nonactivating panel")
-        check(clips.allSatisfy{$0.role==role && !$0.text.isEmpty},"own-speaker clips with subtitles")
-        for c in clips {
-            let a=try? AVAudioPlayer(contentsOf:clipURL(c))
-            check((a?.duration ?? 0)>0.15 && abs((a?.duration ?? 0)-c.duration)<0.1,"clip \(c.id): \(c.text.replacingOccurrences(of:"\n",with:" / "))")
+        check(!normalClips.isEmpty && !heliumClips.isEmpty,"normal and helium clip sets")
+        let voiceSets:[(String,[Clip],Bool)]=[("normal",normalClips,false),("helium",heliumClips,true)]
+        for (label,set,isHelium) in voiceSets {
+            let own=set.filter{$0.role==role}
+            check(!own.isEmpty && own.allSatisfy{$0.role==role && !$0.text.isEmpty},"\(label) own-speaker clips with subtitles")
+            for c in own {
+                let a=try? AVAudioPlayer(contentsOf:clipURL(c,helium:isHelium))
+                check((a?.duration ?? 0)>0.15 && abs((a?.duration ?? 0)-c.duration)<0.1,"\(label) clip \(c.id): \(c.text.replacingOccurrences(of:"\n",with:" / "))")
+            }
+            let timingOK=own.allSatisfy { c in
+                let ls=c.timedLines
+                return !ls.isEmpty && ls.allSatisfy { !$0.text.isEmpty && $0.start.isFinite && $0.end.isFinite && $0.start<=$0.end+0.001 }
+                    && zip(ls,ls.dropFirst()).allSatisfy { $0.start <= $1.start+0.001 }
+            }
+            check(timingOK,"\(label) subtitle lines ordered in time")
         }
-        let timingOK=clips.allSatisfy { c in
-            let ls=c.timedLines
-            return !ls.isEmpty && ls.allSatisfy { !$0.text.isEmpty && $0.start.isFinite && $0.end.isFinite && $0.start<=$0.end+0.001 }
-                && zip(ls,ls.dropFirst()).allSatisfy { $0.start <= $1.start+0.001 }
-        }
-        check(timingOK,"subtitle lines ordered in time")
         let pairOK=(!pairs.isEmpty)
             && Set(pairs.map{$0.id}).count==pairs.count
-            && pairs.allSatisfy { p in
-                allClips.contains{$0.id==p.lei && $0.role == .lei} && allClips.contains{$0.id==p.yu && $0.role == .yu}
+            && [normalClips,heliumClips].allSatisfy { set in
+                pairs.allSatisfy { p in
+                    set.contains{$0.id==p.lei && $0.role == .lei} && set.contains{$0.id==p.yu && $0.role == .yu}
+                }
             }
-        check(pairOK,"dialogue pairs complete")
+        check(pairOK,"dialogue pairs complete in both voices")
         var b=ShuffleBag();var ok=true;var last:Int?
         for _ in 0..<30 {
             var cycle=Set<Int>()

@@ -6,13 +6,15 @@
 
 这 17 段里配成了 **8 组一问一答**：两位靠近时点任一人像，雷军先说一段，余承东马上接对应的那一段；只有正在说话的一方弹动、显示字幕。没靠近时点谁就只播谁自己的单段。把两个人物拖近，两颗头会向对方倾斜。
 
+同一对桌宠内置 **原声** 和 **1.5 倍氦气版** 两套台词：右键 → 声音模式 → “1.5倍氦气版”，两位会一起切换成更尖、更快的氦气声；切回“原声”即可恢复。切换时会停止正在播的台词。
+
 ![雷军与余承东靠近时：一位说话，一位安静歪头](docs/preview.png)
 
 ## 安装与启动
 
 支持 Apple Silicon Mac，系统需要 macOS 14 或更新版本。
 
-1. 从 [Releases](https://github.com/yuhanfu513-ops/leiyu-desktop-pets/releases/latest) 下载 `LeiYu-Desktop-Pets-v2.0.zip`，解压。
+1. 从 [Releases](https://github.com/yuhanfu513-ops/leiyu-desktop-pets/releases/latest) 下载 `LeiYu-Desktop-Pets-v2.1.zip`，解压。
 2. 将其中的两个 `.app` 都拖到“应用程序”。
 3. 分别双击两个桌宠启动；也可以先打开其中一个，再通过右键菜单打开另一位。
 
@@ -26,7 +28,7 @@ xattr -dr com.apple.quarantine /Applications/雷军桌宠.app /Applications/余�
 
 ## 更新与排错
 
-替换 `/Applications` 里的 `.app` 前，先退出两位桌宠再替换。macOS 的旧进程会继续使用启动时读到的台词索引；如果在运行中替换，旧菜单可能指向已经改名或删除的音频，表现为“这句无法播放”或音频和字幕对不上。退出两位再重新打开就能恢复。新版菜单里是 **17 段合并后的台词**（雷军 9 段、余承东 8 段），不是 25 条单句；点其中一段会播放整段，字幕按句子跟着音频切换。
+替换 `/Applications` 里的 `.app` 前，先退出两位桌宠再替换。macOS 的旧进程会继续使用启动时读到的台词索引；如果在运行中替换，旧菜单可能指向已经改名或删除的音频，表现为“这句无法播放”或音频和字幕对不上。退出两位再重新打开就能恢复。新版菜单里是 **17 段合并后的台词**（雷军 9 段、余承东 8 段），不是 25 条单句；点其中一段会播放整段，字幕按句子跟着音频切换。原声和 1.5 倍氦气版共用同一份台词/配对结构，只是音频时长和字幕时间不同。
 
 ## 怎么互动
 
@@ -42,6 +44,7 @@ xattr -dr com.apple.quarantine /Applications/雷军桌宠.app /Applications/余�
 | 播完一段 | 字幕随音频逐句切换，播完约 0.4 秒后消失 |
 | 右键 → 随机说一段 | 只播当前人物的一段（不配对） |
 | 右键 → 两人对话一句 | 靠近时手动开始一组问答；没靠近会提示先拖近 |
+| 右键 → 声音模式 | “原声”或“1.5倍氦气版”；两位一起切换，切换时停止当前播放 |
 | 右键 → 挑一段 | 只播指定的一段（不配对） |
 | 右键 → 停止播放 | 立即停止两位的播放、取消正在进行的问答并清除字幕 |
 | 右键 → 音量 | 调整两位共用的播放音量 |
@@ -49,7 +52,7 @@ xattr -dr com.apple.quarantine /Applications/雷军桌宠.app /Applications/余�
 | 右键 → 人物大小 | 只调整当前人物的大小 |
 | 右键 → 退出当前桌宠 | 只退出这一位 |
 
-右键菜单和菜单栏菜单均提供“打开另一位桌宠”“靠近时互相歪头”的开关及“恢复默认位置”。“靠近时互相歪头”只控制歪头动画，不影响问答：只要在“歪头距离”以内，点人物就会触发一组问答。系统开启“减少动态效果”时，弹动和歪头动画会直接到位，播放、字幕和问答顺序不变。
+右键菜单和菜单栏菜单均提供“打开另一位桌宠”“靠近时互相歪头”的开关及“恢复默认位置”。“靠近时互相歪头”只控制歪头动画，不影响问答：只要在“歪头距离”以内，点人物就会触发一组问答。声音模式两位共用，切换时正在进行的问答会取消。系统开启“减少动态效果”时，弹动和歪头动画会直接到位，播放、字幕和问答顺序不变。
 
 ## 素材与台词
 
@@ -57,9 +60,11 @@ xattr -dr com.apple.quarantine /Applications/雷军桌宠.app /Applications/余�
 - `Assets/yu.png`：余承东的人物图片。
 - `Assets/encounter.m4a`：从 `ScreenRecording_10-25-2026 21-47-11_1.MP4` 提取的完整原始音轨，约 51.36 秒。
 - `Tools/lines.json`：17 段台词的时间边界、说话人和字幕文本；四组连续的余承东句子（“漂移…”“什么2秒…”“不能把所有…”“发布了…”）和两组连续的雷军句子（“最大马力…”“零百加速…”；“但我相信…”“后来者…”）各合并成一段，段内保留原来的句子顺序，合并后的清单顺序仍与原音频一致。合并段用 `parts` 记录每句话的绝对时间。
-- `Assets/Clips/*.mp3`：由 `Tools/build-clips.py` 从原始音轨切出的逐段 MP3，每段只包含一位说话人的声音。
-- `Assets/clips.json`：应用读取的台词清单（编号、角色、字幕、文件名、时长）；合并段还带 `lines`，记录每句话相对音频的起止时间和文本，应用据此逐句切换字幕。
-- `Assets/pairs.json`：8 组问答的配对表（组号、雷军片段 ID、余承东片段 ID），靠近时的“雷军先说、余承东后说”就是按它执行。
+- `Assets/Clips/*.mp3` + `Assets/clips.json`：原声逐段 MP3 和台词清单（1.0 倍速，每段只含一位说话人的声音）。
+- `Assets/Clips-helium/*.mp3` + `Assets/clips-helium.json`：1.5 倍氦气版逐段 MP3 和清单；音频整体重采样到 1.5 倍速，音高约 +7 半音，字幕时间同步除以 1.5。
+- `Assets/Helium-AB.mp3`：你提供的 A/B 对比试听原文件；B 段就是 1.5 倍氦气版，和 `Clips-helium/` 使用同一种重采样。
+- `Assets/clips.json` / `Assets/clips-helium.json`：两套清单的编号、角色、字幕、文件名、时长一一对应；合并段还带 `lines`，记录每句话相对音频的起止时间和文本，应用据此逐句切换字幕。
+- `Assets/pairs.json`：8 组问答的配对表（组号、雷军片段 ID、余承东片段 ID），两套声音共用，靠近时的“雷军先说、余承东后说”就是按它执行。
 
 台词的时间边界来自说话人分离（sherpa-onnx 的 pyannote 分割 + campplus 声纹嵌入）和视频画面里烧录的字幕；字幕按画面字幕和上下文做了整理。最后一句保留了原片的“这他妈的绝对是捣乱”，并按声纹归到雷军；如果不想保留，删除 `Tools/lines.json` 最后一行后重新生成即可。想改字幕，编辑 `Tools/lines.json` 后重新生成：
 
@@ -67,7 +72,7 @@ xattr -dr com.apple.quarantine /Applications/雷军桌宠.app /Applications/余�
 Tools/venv/bin/python Tools/build-clips.py
 ```
 
-图片保留原始透明背景和比例。每个角色只加载 `clips.json` 中属于自己声音的片段，因此不会出现“没说话的那位也在弹”的情况。合并段不会一次把整段字幕全显示出来：应用根据 `lines` 里的相对时间，在音频播到每句话时切换字幕，字幕和声音保持一致。
+图片保留原始透明背景和比例。每个角色只加载当前声音模式清单里属于自己声音的片段，因此不会出现“没说话的那位也在弹”的情况。合并段不会一次把整段字幕全显示出来：应用根据 `lines` 里的相对时间，在音频播到每句话时切换字幕，字幕和声音保持一致。
 
 ### 8 组问答
 
@@ -94,15 +99,18 @@ open build/雷军桌宠.app
 open build/余承东桌宠.app
 ```
 
-构建脚本会生成两个独立应用、复制 `clips.json` 和 `Clips/` 到各自的 `Contents/Resources`，并进行本地签名。图标已包含在 `Assets` 内；如果替换图片，可通过 `Tools/make-icons.swift` 重新生成图标。
+构建脚本会生成两个独立应用，把两套清单（`clips.json`、`clips-helium.json`）和音频目录（`Clips/`、`Clips-helium/`）复制到各自的 `Contents/Resources`，并进行本地签名。图标已包含在 `Assets` 内；如果替换图片，可通过 `Tools/make-icons.swift` 重新生成图标。
 
 如果修改了 `Tools/lines.json`，先运行 `Tools/build-clips.py` 再构建。仓库不包含 `Tools/venv`（虚拟环境太大），需要时自行创建：
 
 ```sh
 python3 -m venv Tools/venv
-Tools/venv/bin/pip install av numpy
-Tools/venv/bin/python Tools/build-clips.py
+Tools/venv/bin/pip install av numpy scipy
+Tools/venv/bin/python Tools/build-clips.py                 # 原声
+Tools/venv/bin/python Tools/build-clips.py --speed 1.5     # 1.5 倍氦气版
 ```
+
+`--speed 1.5` 会整体重采样到 1.5 倍速，音高约 +7 半音（纯五度），字幕时间同步除以 1.5；和 `Assets/Helium-AB.mp3` 的 B 段一致。
 
 如果重新跑说话人分离/转写，再安装 `sherpa-onnx`、`faster-whisper`（见 `Tools/diarize.py`、`Tools/transcribe-lines.py`）。
 
@@ -112,7 +120,7 @@ Tools/venv/bin/python Tools/build-clips.py
 ./Tools/package.sh
 ```
 
-脚本会重新构建、跑两位的自检、把两个 app 和 `使用说明.txt` 放进 `Work/Release/雷余双桌宠/`，并重新生成根目录的 `雷余双桌宠-安装包.zip`。
+脚本会重新构建、跑两位的自检（原声 + 氦气版两套）、把两个 app 和 `使用说明.txt` 放进 `Work/Release/雷余双桌宠/`，并重新生成根目录的 `雷余双桌宠-安装包.zip`。
 
 ## 验证
 
@@ -122,7 +130,7 @@ build/余承东桌宠.app/Contents/MacOS/LeiYuPet --self-test
 python3 Tools/integration-test.py
 ```
 
-自检会检查透明无边框窗口、只加载自己声音的台词、每段都有字幕、字幕时间有序、MP3 时长与清单一致、8 组问答配对完整、随机不重复，以及歪头方向。
+自检会检查透明无边框窗口、原声/氦气两套台词、只加载自己声音的片段、每段都有字幕、字幕时间有序、MP3 时长与各自清单一致、8 组问答在两套声音里都完整、随机不重复，以及歪头方向。
 
 集成检查会启动两个静音、隐藏的测试实例，使用临时状态目录，检查：
 
@@ -133,6 +141,8 @@ python3 Tools/integration-test.py
 - 靠近时从余承东发起问答，仍然是雷军先说、余承东后说，两人的字幕都对；
 - 靠近时从雷军发起问答，也按同样顺序执行；
 - 靠近时直接点人物会触发一组问答；
+- 声音模式切换到 1.5 倍氦气版后，两位都切到氦气音频，台词和字幕仍对应；
+- 氦气版下也能按 8 组配对由雷军先说、余承东后说；切回原声后恢复；
 - 一段没播完时点另一位，会接管唯一的音频通道；
 - 拖近只让两颗头向对方倾斜，不会自动播放；
 - 说话时仍然保持歪头，没说话的那位不弹；
